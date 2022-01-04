@@ -6,6 +6,16 @@
 
 #define MAX_LOADSTRING 100
 
+#define WM_CHECKBINGO WM_USER + 10
+
+BOOL g_bMyTurn = TRUE;
+enum modeBINGO { bingoNONE, bingoMINE, bingoMyBINGO, bingoYOURS, bingoYourBINGO };
+// 가로 세로 대각선 
+enum modeCHECK { HORIZONTAL, VERTICAL, FDIAGONAL, BDIAGONAL };
+
+#define MAX 5
+HWND g_hBingoChild[MAX][MAX];
+
 // 전역 변수:
 HINSTANCE hInst;                                // 현재 인스턴스입니다.
 WCHAR szTitle[MAX_LOADSTRING];                  // 제목 표시줄 텍스트입니다.
@@ -15,6 +25,7 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // 기본 창 클래스 이름입니다.
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
+LRESULT CALLBACK    BingoProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
@@ -80,7 +91,22 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.lpszClassName = szWindowClass;
     wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
 
-    return RegisterClassExW(&wcex);
+    // 여기다 return 하면 에러남, 뒤에서 빙고프락을 return 못하게 됨.
+    RegisterClassExW(&wcex);
+
+    //----------------------------------------
+    // 나의 빙고 등록
+    static HBRUSH hBingoBrush;
+    hBingoBrush = CreateSolidBrush(RGB(255, 255, 0));
+
+    wcex.hbrBackground = hBingoBrush;
+    wcex.lpfnWndProc = BingoProc;
+    wcex.lpszClassName = TEXT("빙고빙고");
+    RegisterClassExW(&wcex);
+
+    return 0;
+
+
 }
 
 //
@@ -97,7 +123,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
     hInst = hInstance; // 인스턴스 핸들을 전역 변수에 저장합니다.
 
-    HWND hWnd = CreateWindowW(szWindowClass, _T("오지우"), WS_OVERLAPPEDWINDOW,
+    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
 
     if (!hWnd)
@@ -120,24 +146,16 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 //  WM_PAINT    - 주 창을 그립니다.
 //  WM_DESTROY  - 종료 메시지를 게시하고 반환합니다.
 //
-
-HWND hEdit;
-HWND hBtn;
-
+//
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    static int x = 20;
-
     switch (message)
     {
     case WM_CREATE:
-    {
-        // hInst = hInstance
-        // CreateWindow(_T("EDIT"), _T("눌러봐"), WS_CHILD | WS_VISIBLE | WS_BORDER, 20, 20, 100, 25, GetDesktopWindow(), NULL, hInst, NULL);
-        hEdit = CreateWindow(_T("EDIT"), _T("눌러봐"), WS_CHILD | WS_VISIBLE | WS_BORDER, 20, 20, 100, 25, hWnd, NULL, hInst, NULL);
-        hBtn = CreateWindow(_T("BUTTON"), _T("Click Me"), WS_CHILD | WS_VISIBLE | WS_BORDER, 20, 120, 100, 25, hWnd, NULL, hInst, NULL);
+        CreateWindow(_T("빙고빙고"), _T("Click Me"),
+            WS_CHILD | WS_VISIBLE | WS_BORDER, 20, 120, 100, 100, hWnd, NULL, hInst, NULL);
         break;
-    }
+
     case WM_COMMAND:
     {
         int wmId = LOWORD(wParam);
@@ -155,52 +173,94 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
     }
     break;
+
     case WM_PAINT:
-    {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hWnd, &ps);
-        // TODO: 여기에 hdc를 사용하는 그리기 코드를 추가합니다...
-
+        hdc = BeginPaint(hWnd, &ps);
         EndPaint(hWnd, &ps);
-    }
-
-    break;
-    case WM_KEYDOWN:
-    {
-        if (wParam == VK_LEFT)
-            x = x - 10;
-        else if (wParam == VK_RIGHT)
-            x = x + 10;
-        SetWindowPos(hBtn, NULL, x, 120, 100, 100, SWP_NOZORDER);
-        break;
-    }
-    // InvalidateRect(hWnd, NULL, FALSE); // WM_PAINT를 발생시킴
-
-
-    case WM_LBUTTONDOWN:
-        SetParent(hBtn, GetDesktopWindow());
-        SetWindowText(hBtn, _T("바탕화면"));
-        SetWindowText(hWnd, _T("바탕화면"));
-        //ShowWindow(hEdit, 0);
-        EnableWindow(hEdit, FALSE);
-        //hEdit = CreateWindow(_T("EDIT"), _T("눌러봐"), WS_CHILD | WS_VISIBLE | WS_BORDER, 20, 20, 100, 25, GetDesktopWindow(), NULL, hInst, NULL);
-        break;
-
-    case WM_RBUTTONDOWN:
-        SetParent(hBtn, hWnd);
-        SetWindowText(hBtn, _T("원상태"));
-        SetWindowText(hWnd, _T("원상태"));
-        //ShowWindow(hEdit, 0);
-        EnableWindow(hEdit, TRUE);
-        //hEdit = CreateWindow(_T("EDIT"), _T("눌러봐"), WS_CHILD | WS_VISIBLE | WS_BORDER, 20, 20, 100, 25, hWnd, NULL, hInst, NULL);
         break;
 
     case WM_DESTROY:
         PostQuitMessage(0);
         break;
+
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
+    return 0;
+}
+
+LRESULT CALLBACK BingoProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+
+    switch (message)
+    {
+
+    case WM_CREATE:
+        // FALSE TRUE 관리하는 변수 이름 "동그라미"
+        SetProp(hWnd, __T("동그라미"), FALSE);
+        return 0;
+    case WM_LBUTTONDOWN:
+    {
+        int mode = (int)GetProp(hWnd, __T("동그라미"));
+        if (mode) mode = FALSE;
+        else
+            mode = TRUE;
+        SetProp(hWnd, __T("동그라미"), (HANDLE)mode);
+
+        SendMessage(GetParent(hWnd), WM_CHECKBINGO, (WPARAM)hWnd, mode);
+
+        InvalidateRect(hWnd, NULL, TRUE);
+        break;
+    }
+
+    case WM_PAINT:
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hWnd, &ps);
+        hdc = BeginPaint(hWnd, &ps);
+        int mode = (int)GetProp(hWnd, TEXT("nBingoMode"));
+
+        HBRUSH MyBrush, OldBrush;
+
+        switch (mode)
+        {
+        case bingoNONE:
+            Rectangle(hdc, 10, 10, 90, 90);
+            break;
+        case bingoMINE:
+            Ellipse(hdc, 10, 10, 90, 90);
+            break;
+        case bingoYOURS:
+            MoveToEx(hdc, 10, 10, NULL); LineTo(hdc, 90, 90);
+            MoveToEx(hdc, 10, 90, NULL); LineTo(hdc, 90, 10);
+            break;
+        case bingoMyBINGO:
+            MyBrush = CreateSolidBrush(RGB(255, 0, 255));
+            OldBrush = (HBRUSH)SelectObject(hdc, MyBrush);
+            Rectangle(hdc, 10, 10, 90, 90);
+            SelectObject(hdc, OldBrush);
+            DeleteObject(MyBrush);
+            TextOut(hdc, 10, 10, TEXT("나의 빙고"), 5);
+            break;
+        case bingoYourBINGO:
+            MyBrush = CreateSolidBrush(RGB(0, 255, 255));
+            OldBrush = (HBRUSH)SelectObject(hdc, MyBrush);
+            Rectangle(hdc, 10, 10, 90, 90);
+            SelectObject(hdc, OldBrush);
+            DeleteObject(MyBrush);
+            TextOut(hdc, 10, 10, TEXT("너의 빙고"), 5);
+            break;
+        }
+    break;
+
+    case WM_DESTROY:
+        RemoveProp(hWnd, TEXT("nBingoMode"));
+        return 0;
+    default:
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+
     return 0;
 }
 

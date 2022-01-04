@@ -5,6 +5,7 @@
 #include "win32Project.h"
 
 #define MAX_LOADSTRING 100
+#define WM_CHECKBINGO WM_USER + 10
 
 // 전역 변수:
 HINSTANCE hInst;                                // 현재 인스턴스입니다.
@@ -80,6 +81,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.lpszClassName = szWindowClass;
     wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
 
+    // 여기다 return 하면 에러남, 뒤에서 빙고프락을 return 못하게 됨.
     RegisterClassExW(&wcex);
 
 //----------------------------------------
@@ -141,11 +143,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
-     //태어날 때
+        //태어날 때
+
     case WM_CREATE:
     {
         // 부모는 hWnd 이다. (부모좌표 기준)
-        CreateWindow(_T("빙고빙고"), _T("Click Me"), 
+        CreateWindow(_T("빙고빙고"), _T("Click Me"),
             WS_CHILD | WS_VISIBLE | WS_BORDER, 20, 120, 100, 100, hWnd, NULL, hInst, NULL);
         CreateWindow(_T("빙고빙고"), _T("Click You"), WS_CHILD | WS_VISIBLE | WS_BORDER, 20, 220, 100, 100, hWnd, NULL, hInst, NULL);
         break;
@@ -173,15 +176,95 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         HDC hdc = BeginPaint(hWnd, &ps);
         // TODO: 여기에 hdc를 사용하는 그리기 코드를 추가합니다...
         EndPaint(hWnd, &ps);
+
     }
     break;
-    
+
+    // 빙고를 체크하라는 메세지 
+    case WM_CHECKBINGO: //WM_USER + 10
+        TCHAR str[100];
+        // FALSE == X , TRUE == O 이다. 
+        if (lParam == FALSE)
+        {
+            wsprintf(str, _T("자식, %d번 X"), wParam);
+        }
+        else 
+        {
+            wsprintf(str, _T("자식, %d번 O"), wParam);
+        }
+        SetWindowText(hWnd, str);
+        break;
+
+
     case WM_DESTROY:
         PostQuitMessage(0);
         break;
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
+    return 0;
+}
+
+LRESULT CALLBACK BingoProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    static BOOL bEllipse = FALSE;
+    switch (message)
+    {
+
+    case WM_CREATE:
+        // FALSE TRUE 관리하는 변수 이름 "동그라미"
+        SetProp(hWnd, __T("동그라미"), FALSE);
+        break;
+    case WM_LBUTTONDOWN:
+    {
+
+        //SendMessage(hWnd, WM_CLOSE, 0, 0);
+        //if (bEllipse)
+        //    bEllipse = FALSE;
+        //else
+        //    bEllipse = TRUE
+       
+        BOOL mode = (BOOL)GetProp(hWnd, __T("동그라미"));
+        if (mode) mode = FALSE;
+        else
+            mode = TRUE;
+        SetProp(hWnd, __T("동그라미"), (HANDLE)mode);
+
+        SendMessage(GetParent(hWnd), WM_CHECKBINGO, (WPARAM)hWnd, mode);
+
+        InvalidateRect(hWnd, NULL, TRUE);
+        break;
+    }
+
+    case WM_PAINT:
+    {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hWnd, &ps);
+        // TODO: 여기에 hdc를 사용하는 그리기 코드를 추가합니다...
+        // Rectangle(hdc, 0, 0, 100, 100);
+        BOOL mode = (BOOL)GetProp(hWnd, __T("동그라미"));
+        if (mode)
+        {
+            Ellipse(hdc, 10, 10, 90, 90);
+        }
+        else 
+        {
+            MoveToEx(hdc, 10, 10, NULL); LineTo(hdc, 90, 90);
+            MoveToEx(hdc, 90, 10, NULL); LineTo(hdc, 10, 90);
+        }
+
+        TextOut(hdc, 10, 10, _T("나야"), 2);
+        EndPaint(hWnd, &ps);
+    }
+    break;
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+    default:
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+
     return 0;
 }
 
@@ -206,56 +289,3 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
     return (INT_PTR)FALSE;
 }
 
-LRESULT CALLBACK BingoProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-    static BOOL bEllipse = FALSE;
-    switch (message)
-    {
-    case WM_CREATE:
-        // FALSE TRUE 관리하는 변수 이름 "동그라미"
-        SetProp(hWnd, __T("동그라미"),FALSE);
-        break;
-    case WM_LBUTTONDOWN:
-    {
-        //SendMessage(hWnd, WM_CLOSE, 0, 0);
-        //if (bEllipse)
-        //    bEllipse = FALSE;
-        //else
-        //    bEllipse = TRUE;
-        BOOL mode = (BOOL)GetProp(hWnd, __T("동그라미"));
-        if (mode) mode = FALSE;
-        else
-            mode = TRUE;
-        SetProp(hWnd, __T("동그라미"), (HANDLE)mode);
-        InvalidateRect(hWnd, NULL, TRUE);
-        break;
-    }
-      
-    case WM_PAINT:
-    {
-        PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hWnd, &ps);
-        // TODO: 여기에 hdc를 사용하는 그리기 코드를 추가합니다...
-        // Rectangle(hdc, 0, 0, 100, 100);
-        BOOL mode = (BOOL)GetProp(hWnd, __T("동그라미"));
-        if (mode)
-        {
-            Ellipse(hdc, 10, 10, 90, 90);
-        }
-        else {
-            MoveToEx(hdc, 10, 10, NULL); LineTo(hdc, 90, 90);
-            MoveToEx(hdc, 90, 10, NULL); LineTo(hdc, 10, 90);
-        }
-
-        TextOut(hdc, 10, 10, _T("나야"), 2);
-        EndPaint(hWnd, &ps);
-    }
-    break;
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        break;
-    default:
-        return DefWindowProc(hWnd, message, wParam, lParam);
-    }
-    return 0;
-}
